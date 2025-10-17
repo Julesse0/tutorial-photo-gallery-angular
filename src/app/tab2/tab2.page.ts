@@ -1,39 +1,47 @@
-import { Component } from '@angular/core';
-import { ActionSheetController } from '@ionic/angular';
-import { UserPhoto, PhotoService } from '../services/photo.service';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { Subscription } from 'rxjs';
+import { PhotoService, UserPhoto } from '../services/photo.service';
 
 @Component({
   selector: 'app-tab2',
-  templateUrl: 'tab2.page.html',
-  styleUrls: ['tab2.page.scss']
+  templateUrl: './tab2.page.html',
+  providers: [DatePipe]
 })
-export class Tab2Page {
+export class Tab2Page implements OnInit, OnDestroy {
+  favs: UserPhoto[] = [];
+  selected: UserPhoto | null = null;
+  private sub!: Subscription;
 
-  constructor(public photoService: PhotoService, public actionSheetController: ActionSheetController) {}
+  constructor(public ps: PhotoService, private date: DatePipe) {}
 
   async ngOnInit() {
-    await this.photoService.loadSaved();
+    await this.ps.loadSaved();
+    this.refresh();
+    this.sub = this.ps.changed$.subscribe(() => this.refresh());
   }
 
-  public async showActionSheet(photo: UserPhoto, position: number) {
-    const actionSheet = await this.actionSheetController.create({
-      header: 'Photos',
-      buttons: [{
-        text: 'Delete',
-        role: 'destructive',
-        icon: 'trash',
-        handler: () => {
-          this.photoService.deletePicture(photo, position);
-        }
-      }, {
-        text: 'Cancel',
-        icon: 'close',
-        role: 'cancel',
-        handler: () => {
-          // Nothing to do, action sheet is automatically closed
-         }
-      }]
-    });
-    await actionSheet.present();
+  ngOnDestroy() {
+    if (this.sub) this.sub.unsubscribe();
+  }
+
+  refresh() {
+    this.favs = this.ps.photos.filter(p => p.liked);
+  }
+
+  when(iso: string) {
+    return this.date.transform(iso, 'dd/MM/yyyy HH:mm');
+  }
+
+  async toggle(p: UserPhoto) {
+    await this.ps.toggleLike(p.id);
+  }
+
+  open(p: UserPhoto) {
+    this.selected = p;
+  }
+
+  close() {
+    this.selected = null;
   }
 }
